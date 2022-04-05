@@ -4,6 +4,7 @@
 
 #include "packet.h"
 #include "constants.h"
+#include "buffer.h"
 
 typedef enum
 {
@@ -14,6 +15,16 @@ typedef enum
   RIGHT=4
 } TDirection;
 volatile TDirection dir = STOP;
+
+// buffer arrays for serialisation/deserialisation
+volatile TBuffer sendBuff, recBuff;
+
+// Use 512-byte buffers sendBuff & recBuff
+#define BUFF_LEN                 512
+
+// Atmega328P AVR clock frequency
+#define CLOCKFREQ               16000000
+#define BAUDRATE                9600
 
 // Power management constants
 #define PRR_TWI_MASK            0b10000000
@@ -375,6 +386,24 @@ ISR(TIMER1_COMPB_vect)
 
 }
 
+// ISRs for serial read and write operations
+ISR(USART_RX_vect) {
+    unsigned char data = UDR0;
+
+    writeBuffer(&recBuff, data);
+}
+
+ISR(USART_UDRE_vect) {
+    unsigned char data;
+    TBufferResult result = readBuffer(&sendBuff, &data);
+    
+    if (result == BUFFER_OK) {
+        UDR0 = data;
+    } else if (result == BUFFER_EMPTY) {
+        UCSR0B &= 0b11011111;
+    }
+}
+
 
 /*
  * Setup and start codes for serial communications
@@ -386,7 +415,25 @@ ISR(TIMER1_COMPB_vect)
 void setupSerial()
 {
   // To replace later with bare-metal.
-  Serial.begin(9600);
+  // Serial.begin(9600);
+
+  // Initialise send and receive buffer to appropriate length(in BUF_LEN macro)
+  initBuffer(&sendBuff, BUFF_LEN);
+  initBuffer(&recBuff, BUFF_LEN);
+
+  // Only set bits 1 & 2 for data size of 8 bits. Disable parity bits(bits 4 & 5), use Asynchronous USART mode(bits 6 & 7), and use just 1 stop bit(bit 3)
+  UCSR0C = 0b00000110;
+  // Zero everything in OCSR0A to disable double-speed and multiprocessor modes
+  UCSR0A = 0;
+  // Clear bit 2 to set data size to 8 bits, clear bits 0:1 since we don't use 9-bit data size
+  UCSR0B &= 0b11111000;
+
+  // Calculate value for UBRR register to use a 9600bps baudrate
+  uint16_t baudrate = (CLOCKFREQ / 16 / BAUDRATE) - 1;
+  // Right shift baudrate by 8 to get the 8 high bits for UBBR0H
+  UBRR0H = (uint8_t)(baudrate >> 8);
+  // Truncate the 8 high bits in baudrate variable to store the low bits in UBRR0L
+  UBRR0L = (uint8_t)baudrate;
 }
 
 // Start the serial connection. For now we are using
@@ -397,7 +444,9 @@ void startSerial()
 {
   // Empty for now. To be replaced with bare-metal code
   // later on.
-  
+
+  // Set bits 3 & 4 to enable the USART receiver and transmitter, set bits 5 & 7 to enable USART_RX and USART_UDRE interrupts
+  UCSR0B |= 0b10111000;
 }
 
 // Read the serial port. Returns the read character in
@@ -407,11 +456,21 @@ void startSerial()
 int readSerial(char *buffer)
 {
 
+  /*
+   * Old Scratch code for serial reading
   int count=0;
 
   while(Serial.available())
     buffer[count++] = Serial.read();
 
+  return count;
+  */
+  
+  int count;
+  
+  for (count = 0; dataAvailable(&recBuff); count++) {
+        readBuffer(&recBuff, (unsigned char*)&buffer[count]);
+  }
   return count;
 }
 
@@ -420,7 +479,23 @@ int readSerial(char *buffer)
 
 void writeSerial(const char *buffer, int len)
 {
-  Serial.write(buffer, len);
+  // Old Scratch code for serial writing
+  // Serial.write(buffer, len);
+
+  TBufferResult result = BUFFER_OK;
+
+  int count;
+
+  for (int i = 1; i < len && result == BUFFER_OK; i++) 
+  {
+    result = writeBuffer(&sendBuff, buffer[count]);
+  }
+
+  // Write the first byte of the buffer into UDR0 so that USART_UDRE gets triggered and the ISR takes over for writing the rest of the buffer's bytes
+  UDR0 = buffer[0];
+
+  // Enable the USART_UDRE interrupt
+  UCSR0B |= 0b100000;
 }
 
 /*
