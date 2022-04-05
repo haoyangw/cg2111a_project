@@ -19,8 +19,8 @@ volatile TDirection dir = STOP;
 // buffer arrays for serialisation/deserialisation
 volatile TBuffer sendBuff, recBuff;
 
-// Use 512-byte buffers sendBuff & recBuff
-#define BUFF_LEN                512
+// Use 140-byte buffers sendBuff & recBuff since TComms size = 140 bytes > TPacket size
+#define BUFF_LEN                140
 
 // Atmega328P AVR clock frequency
 #define CLOCKFREQ               16000000
