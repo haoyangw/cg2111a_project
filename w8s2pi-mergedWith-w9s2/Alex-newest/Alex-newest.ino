@@ -16,7 +16,6 @@ typedef enum
 volatile TDirection dir = STOP;
 
 // Power management constants
-#define PIN_5 (1 << 5)
 #define PRR_TWI_MASK            0b10000000
 #define PRR_SPI_MASK            0b00000100
 #define ADCSRA_ADC_MASK         0b10000000
@@ -40,22 +39,26 @@ volatile TDirection dir = STOP;
 
 #define WHEEL_CIRC          20
 
-#define ALEX_LENGTH         6
-#define ALEX_WIDTH          10
+#define ALEX_LENGTH         4
+#define ALEX_WIDTH          6
 #define PI                  3.141592654
 
-#define LF_MUL               0.993
-#define LR_MUL               0.9868
+#define LF_MUL               1
+#define LR_MUL               1
 
 float AlexDiagonal = 0.0;
 float AlexCirc = 0.0;
 
 // Motor control pins. You need to adjust these till
 // Alex moves in the correct direction
-#define LF                  6   // Left forward pin
-#define LR                  5   // Left reverse pin
-#define RF                  10  // Right forward pin
-#define RR                  9  // Right reverse pin
+#define LF                  5   // Left forward pin
+#define LR                  6   // Left reverse pin
+#define RF                  9  // Right forward pin
+#define RR                  10  // Right reverse pin
+#define PIN5 (1 << 5)
+#define PIN6 (1 << 6)
+#define PIN9 (1 << 1)
+#define PIN10 (1 << 2)
 
 /*
  *    Alex's State Variables
@@ -128,8 +131,8 @@ void setupPowerSaving() {
   // SMCR &= SMCR_IDLE_MODE_MASK;
   // Set Port B Pin 5 as output pin, then write a logic LOW
   // to it so that the LED tied to Arduino's Pin 13 is OFF.
-  DDRB |= PIN_5;
-  PORTB &= ~PIN_5;
+  DDRB |= PIN5;
+  PORTB &= ~PIN5;
 }
 
 /*
@@ -352,6 +355,27 @@ ISR(INT1_vect) {
 
 // Implement INT0 and INT1 ISRs above.
 
+ISR(TIMER0_COMPA_vect) 
+{
+
+}
+
+ISR(TIMER0_COMPB_vect) 
+{
+
+}
+
+ISR(TIMER1_COMPA_vect) 
+{
+
+}
+
+ISR(TIMER1_COMPB_vect) 
+{
+
+}
+
+
 /*
  * Setup and start codes for serial communications
  * 
@@ -412,9 +436,23 @@ void setupMotors()
   /* Our motor set up is:  
    *    A1IN - Pin 5, PD5, OC0B
    *    A2IN - Pin 6, PD6, OC0A
+   *    B2IN - Pin 9, PB1, OC1A
    *    B1IN - Pin 10, PB2, OC1B
-   *    B2In - pIN 11, PB3, OC2A
    */
+  DDRD |= (PIN6 | PIN5);
+  TCNT0 = 0;
+  TIMSK0 |= 0b110; // OCIEA = 1 OCIEB = 1
+  OCR0A = 0;
+  OCR0B = 0;
+  TCCR0B = 0b00000011; // Set prescalar to 64
+
+  DDRB |= (PIN9 | PIN10);
+  TCNT1 = 0;
+  TIMSK1 |= 0b110;
+  OCR1A = 0;
+  OCR1B = 0;
+  TCCR1B = 0b00000011; // Set prescalar to 64
+   
 }
 
 // Start the PWM for Alex's motors.
@@ -422,7 +460,28 @@ void setupMotors()
 // blank.
 void startMotors()
 {
-  
+  TCCR0A = 0b10100001; // Set PWM mode to Phase-correct
+  TCCR1A = 0b10100001; // Set PWM mode to Phase-correct 8-bit to match pwmVal()'s output size(8-bit analog)
+}
+
+void analogWriteBm(int port, int pwmVal) 
+{
+  switch(port)
+  {
+    case LF:
+      OCR0B = pwmVal;
+      break;
+    case LR:
+      OCR0A = pwmVal;
+      break;
+    case RF:
+      OCR1A = pwmVal;
+      break;
+    case RR:
+      OCR1B = pwmVal;
+      break;
+  }
+
 }
 
 // Convert percentages to PWM values
@@ -464,10 +523,10 @@ void forward(float dist, float speed)
 
   dir = FORWARD;
   
-  analogWrite(LF, val * LF_MUL);
-  analogWrite(RF, val);
-  analogWrite(LR, 0);
-  analogWrite(RR, 0);
+  analogWriteBm(LF, val * LF_MUL);
+  analogWriteBm(RF, val);
+  analogWriteBm(LR, 0);
+  analogWriteBm(RR, 0);
 }
 
 // Reverse Alex "dist" cm at speed "speed".
@@ -495,10 +554,10 @@ void reverse(float dist, float speed)
 
   dir = BACKWARD;
   
-  analogWrite(LR, val * LR_MUL);
-  analogWrite(RR, val);
-  analogWrite(LF, 0);
-  analogWrite(RF, 0);
+  analogWriteBm(LR, val * LR_MUL);
+  analogWriteBm(RR, val);
+  analogWriteBm(LF, 0);
+  analogWriteBm(RF, 0);
 }
 
 unsigned long computeDeltaTicks(float ang) {
@@ -528,10 +587,10 @@ void left(float ang, float speed)
 
   dir = LEFT;
   
-  analogWrite(LR, val);
-  analogWrite(RF, val);
-  analogWrite(LF, 0);
-  analogWrite(RR, 0);
+  analogWriteBm(LR, val);
+  analogWriteBm(RF, val);
+  analogWriteBm(LF, 0);
+  analogWriteBm(RR, 0);
 }
 
 // Turn Alex right "ang" degrees at speed "speed".
@@ -555,20 +614,20 @@ void right(float ang, float speed)
   // the left wheel forward.
 
   dir = RIGHT;
-  
-  analogWrite(RR, val);
-  analogWrite(LF, val);
-  analogWrite(LR, 0);
-  analogWrite(RF, 0);
+
+  analogWriteBm(RR, val);
+  analogWriteBm(LF, val);
+  analogWriteBm(LR, 0);
+  analogWriteBm(RF, 0);
 }
 
 // Stop Alex. To replace with bare-metal code later.
 void stop()
 {
-  analogWrite(LF, 0);
-  analogWrite(LR, 0);
-  analogWrite(RF, 0);
-  analogWrite(RR, 0);
+  analogWriteBm(LF, 0);
+  analogWriteBm(LR, 0);
+  analogWriteBm(RF, 0);
+  analogWriteBm(RR, 0);
 }
 
 /*
