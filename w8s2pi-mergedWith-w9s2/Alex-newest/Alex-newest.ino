@@ -20,7 +20,7 @@ volatile TDirection dir = STOP;
 volatile TBuffer sendBuff, recBuff;
 
 // Use 512-byte buffers sendBuff & recBuff
-#define BUFF_LEN                 512
+#define BUFF_LEN                512
 
 // Atmega328P AVR clock frequency
 #define CLOCKFREQ               16000000
@@ -192,7 +192,6 @@ void sendStatus()
   statusPacket.params[7] = (uint32_t) rightReverseTicksTurns;
   statusPacket.params[8] = (uint32_t) forwardDist;
   statusPacket.params[9] = (uint32_t) reverseDist;
-  //dbprint("Left forward ticks: %u", leftForwardTicks);
   sendResponse(&statusPacket);
 }
 
@@ -425,8 +424,6 @@ void setupSerial()
   UCSR0C = 0b00000110;
   // Zero everything in OCSR0A to disable double-speed and multiprocessor modes
   UCSR0A = 0;
-  // Clear bit 2 to set data size to 8 bits, clear bits 0:1 since we don't use 9-bit data size
-  UCSR0B &= 0b11111000;
 
   // Calculate value for UBRR register to use a 9600bps baudrate
   uint16_t baudrate = (CLOCKFREQ / 16 / BAUDRATE) - 1;
@@ -446,7 +443,8 @@ void startSerial()
   // later on.
 
   // Set bits 3 & 4 to enable the USART receiver and transmitter, set bits 5 & 7 to enable USART_RX and USART_UDRE interrupts
-  UCSR0B |= 0b10111000;
+  // Clear bit 2 to set data size to 8 bits, clear bits 0:1 since we don't use 9-bit data size, disable USART_TX interrupt since using USART_UDRE interrupt is slightly more efficient
+  UCSR0B = 0b10111000;
 }
 
 // Read the serial port. Returns the read character in
@@ -484,11 +482,9 @@ void writeSerial(const char *buffer, int len)
 
   TBufferResult result = BUFFER_OK;
 
-  int count;
-
   for (int i = 1; i < len && result == BUFFER_OK; i++) 
   {
-    result = writeBuffer(&sendBuff, buffer[count]);
+    result = writeBuffer(&sendBuff, buffer[i]);
   }
 
   // Write the first byte of the buffer into UDR0 so that USART_UDRE gets triggered and the ISR takes over for writing the rest of the buffer's bytes
