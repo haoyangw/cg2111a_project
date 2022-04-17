@@ -54,7 +54,7 @@ volatile TBuffer sendBuff, recBuff;
 #define ALEX_WIDTH          6
 #define PI                  3.141592654
 
-#define LF_MUL               1
+#define LF_MUL               0.997
 #define LR_MUL               1
 
 float AlexDiagonal = 0.0;

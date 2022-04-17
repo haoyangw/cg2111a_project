@@ -185,6 +185,7 @@ void sendCommand(char command)
 			getParams(&commandPacket);
 			commandPacket.command = COMMAND_FORWARD;
 			sendPacket(&commandPacket);
+			printf("Finished sending command");
 			break;
 
 		case 'b':
@@ -192,6 +193,7 @@ void sendCommand(char command)
 			getParams(&commandPacket);
 			commandPacket.command = COMMAND_REVERSE;
 			sendPacket(&commandPacket);
+			printf("Finished sending command");
 			break;
 
 		case 'l':
@@ -199,6 +201,7 @@ void sendCommand(char command)
 			getParams(&commandPacket);
 			commandPacket.command = COMMAND_TURN_LEFT;
 			sendPacket(&commandPacket);
+			printf("Finished sending command");
 			break;
 
 		case 'r':
@@ -206,12 +209,14 @@ void sendCommand(char command)
 			getParams(&commandPacket);
 			commandPacket.command = COMMAND_TURN_RIGHT;
 			sendPacket(&commandPacket);
+			printf("Finished sending command");
 			break;
 
 		case 's':
 		case 'S':
 			commandPacket.command = COMMAND_STOP;
 			sendPacket(&commandPacket);
+			printf("Finished sending command");
 			break;
 
 		case 'c':
@@ -219,12 +224,14 @@ void sendCommand(char command)
 			commandPacket.command = COMMAND_CLEAR_STATS;
 			commandPacket.params[0] = 0;
 			sendPacket(&commandPacket);
+			printf("Finished sending command");
 			break;
 
 		case 'g':
 		case 'G':
 			commandPacket.command = COMMAND_GET_STATS;
 			sendPacket(&commandPacket);
+			printf("Finished sending command");
 			break;
 
 		case 'q':
